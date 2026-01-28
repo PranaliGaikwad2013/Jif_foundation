@@ -24,6 +24,18 @@ const Volunteers = () => {
   const [submitting, setSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  
+  // Search, filter, and pagination states
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [meta, setMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+    per_page: 10,
+  });
 
   useEffect(() => {
     fetchVolunteers();
@@ -35,12 +47,18 @@ const Volunteers = () => {
     } else if (action === 'export') {
       handleExport();
     }
-  }, [searchParams]);
+  }, [searchParams, search, statusFilter, currentPage, perPage]);
 
   const fetchVolunteers = async () => {
     try {
-      const response = await volunteerAPI.getAll();
+      const response = await volunteerAPI.getAll({
+        search,
+        status: statusFilter,
+        page: currentPage,
+        per_page: perPage,
+      });
       setVolunteers(response.data.data);
+      setMeta(response.data.meta);
     } catch (error) {
       console.error('Error fetching volunteers:', error);
     } finally {
@@ -166,6 +184,32 @@ const Volunteers = () => {
     }
   };
 
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
+  const handleStatusFilterChange = (e) => {
+    setStatusFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page on filter change
+  };
+
+  const handlePerPageChange = (e) => {
+    setPerPage(parseInt(e.target.value));
+    setCurrentPage(1); // Reset to first page on per page change
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handleClearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setCurrentPage(1);
+    setPerPage(10);
+  };
+
   const countryCodes = [
     { code: '+91', country: 'India' },
     { code: '+1', country: 'USA' },
@@ -217,6 +261,59 @@ const Volunteers = () => {
               </svg>
               Export
             </button>
+          </div>
+        </div>
+
+        {/* Search and Filter Section */}
+        <div className="card-body bg-light border-bottom">
+          <div className="row g-3">
+            <div className="col-md-4">
+              <div className="input-group">
+                <span className="input-group-text">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-search" viewBox="0 0 16 16">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search by name, email, or mobile..."
+                  value={search}
+                  onChange={handleSearchChange}
+                />
+              </div>
+            </div>
+            <div className="col-md-3">
+              <select
+                className="form-select"
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div className="col-md-2">
+              <select
+                className="form-select"
+                value={perPage}
+                onChange={handlePerPageChange}
+              >
+                <option value="5">5 per page</option>
+                <option value="10">10 per page</option>
+                <option value="25">25 per page</option>
+                <option value="50">50 per page</option>
+              </select>
+            </div>
+            <div className="col-md-3">
+              <button className="btn btn-secondary w-100" onClick={handleClearFilters}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" className="bi bi-x-lg me-1" viewBox="0 0 16 16">
+                  <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                </svg>
+                Clear Filters
+              </button>
+            </div>
           </div>
         </div>
 
@@ -293,6 +390,47 @@ const Volunteers = () => {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {meta.total > 0 && (
+          <div className="d-flex justify-content-between align-items-center mt-3">
+            <div className="text-muted">
+              Showing {((meta.current_page - 1) * meta.per_page) + 1} to {Math.min(meta.current_page * meta.per_page, meta.total)} of {meta.total} volunteers
+            </div>
+            <nav>
+              <ul className="pagination mb-0">
+                <li className={`page-item ${meta.current_page === 1 ? 'disabled' : ''}`}>
+                  <button 
+                    className="page-link" 
+                    onClick={() => handlePageChange(meta.current_page - 1)}
+                    disabled={meta.current_page === 1}
+                  >
+                    Previous
+                  </button>
+                </li>
+                {Array.from({ length: meta.last_page }, (_, i) => i + 1).map(page => (
+                  <li key={page} className={`page-item ${meta.current_page === page ? 'active' : ''}`}>
+                    <button 
+                      className="page-link" 
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </button>
+                  </li>
+                ))}
+                <li className={`page-item ${meta.current_page === meta.last_page ? 'disabled' : ''}`}>
+                  <button 
+                    className="page-link" 
+                    onClick={() => handlePageChange(meta.current_page + 1)}
+                    disabled={meta.current_page === meta.last_page}
+                  >
+                    Next
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        )}
       </div>
 
       {/* Add/Edit Modal */}

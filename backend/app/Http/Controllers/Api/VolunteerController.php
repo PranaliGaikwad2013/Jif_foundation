@@ -12,15 +12,40 @@ use Illuminate\Support\Str;
 class VolunteerController extends Controller
 {
     /**
-     * Display a listing of volunteers.
+     * Display a listing of volunteers with search, pagination, and filter.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $volunteers = Volunteer::orderBy('created_at', 'desc')->get();
+        $query = Volunteer::query();
+
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('mobile', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by status
+        if ($request->has('status') && !empty($request->status)) {
+            $query->where('status', $request->status);
+        }
+
+        // Pagination
+        $perPage = $request->get('per_page', 10);
+        $volunteers = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $volunteers
+            'data' => $volunteers->items(),
+            'meta' => [
+                'current_page' => $volunteers->currentPage(),
+                'last_page' => $volunteers->lastPage(),
+                'total' => $volunteers->total(),
+                'per_page' => $volunteers->perPage(),
+            ]
         ]);
     }
 
